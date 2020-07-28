@@ -78,6 +78,7 @@ func GetSelectableTiles(bb BoggleBoard, subjectTile Tile, targetLetter string) [
 // SelectTiles ...
 func SelectTiles(bb BoggleBoard, selectableTiles []Tile, remainingWord string) (BoggleBoard, string) {
 	var nextSelectableTiles []Tile
+	nextBB := bb
 	// done: no remaining choices / no remaining processing
 	if len(selectableTiles) == 0 || len(remainingWord) == 0 {
 		return bb, remainingWord
@@ -85,28 +86,28 @@ func SelectTiles(bb BoggleBoard, selectableTiles []Tile, remainingWord string) (
 	for _, tile := range selectableTiles {
 		// checks: tile data matches boggleboard, tile letter matches currently processed rune or special char *
 		if tile.Letter == bb.Grid[tile.Row][tile.Col] && (tile.Letter == string([]rune(remainingWord)[0]) || tile.Letter == "*") {
-			bbWithMarkings := bb
-			bbWithMarkings.Grid[tile.Row][tile.Col] = "!" // prevents reverse selection
+			maybeNextBB := nextBB
+			maybeNextBB.Grid[tile.Row][tile.Col] = "!" // prevents reverse selection
 			// prevent index out of range
 			if len(remainingWord) > 1 {
 				// check if the next letter has selectable tiles, otherwise current selection is a dead end
-				maybeNextSelectableTiles := GetSelectableTiles(bbWithMarkings, tile, string([]rune(remainingWord)[1]))
+				maybeNextSelectableTiles := GetSelectableTiles(maybeNextBB, tile, string([]rune(remainingWord)[1]))
 				if len(maybeNextSelectableTiles) == 0 {
 					continue
 				}
 				// has selectable tiles, can 'commit'
 				nextSelectableTiles = maybeNextSelectableTiles
 				remainingWord = remainingWord[1:]
-				bb = bbWithMarkings
+				nextBB = maybeNextBB
 			} else {
 				// last letter selected
 				remainingWord = ""
-				bb = bbWithMarkings
+				nextBB = maybeNextBB
 				break
 			}
 		}
 	}
-	return SelectTiles(bb, nextSelectableTiles, remainingWord)
+	return SelectTiles(nextBB, nextSelectableTiles, remainingWord)
 }
 
 // IsWordInDictionary ...
@@ -178,12 +179,22 @@ func main() {
 	}
 
 	// play boggle
+	resultBoggleBoard := boggleBoard
+	resultWord := targetWordUpper
 	startingTiles := GetStartingTiles(boggleBoard, string([]rune(targetWordUpper)[0]))
-	markedBoggleBoard, remainingWord := SelectTiles(boggleBoard, startingTiles, targetWordUpper)
+	// startingTile must be passed in one at a time to allow 'reset' of the boggleboard
+	for _, startingTile := range startingTiles {
+		bb, word := SelectTiles(boggleBoard, []Tile{startingTile}, targetWordUpper)
+		if len(word) == 0 {
+			resultBoggleBoard = bb
+			resultWord = word
+			break
+		}
+	}
 
-	if len(remainingWord) == 0 {
+	if len(resultWord) == 0 {
 		fmt.Println("(ﾉ◕ヮ◕)ﾉ*:･ﾟ✧ BOGGLE ✧ﾟ･: *ヽ(◕ヮ◕ヽ)")
-		for _, row := range markedBoggleBoard.Grid {
+		for _, row := range resultBoggleBoard.Grid {
 			fmt.Println(row)
 		}
 		os.Exit(0)
